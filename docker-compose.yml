@@ -1,0 +1,24 @@
+services:
+  mihomo:
+    build: .
+    image: mihomo-proxy:v1.19.31
+    container_name: mihomo-proxy
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/etc/mihomo
+      # Base image VOLUME /root/.config/mihomo would otherwise create
+      # an anonymous Docker volume under /var/lib/docker/volumes.
+      - ./data:/root/.config/mihomo
+    networks:
+      telegram-proxy:
+        aliases:
+          - proxy
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
+
+networks:
+  telegram-proxy:
+    name: telegram-proxy
