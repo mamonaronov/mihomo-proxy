@@ -41,9 +41,9 @@ class TestComposeAndEntrypoint(unittest.TestCase):
         self.assertIn("REPLACE_ME", text)
         self.assertIn("is a placeholder", text)
 
-    def test_dockerfile_is_the_only_mihomo_version_pin(self) -> None:
+    def test_dockerfile_is_the_only_mihomo_base_tag(self) -> None:
         dockerfile = (REPO / "Dockerfile").read_text(encoding="utf-8")
-        self.assertRegex(dockerfile, r"^FROM metacubex/mihomo:v\d+")
+        self.assertRegex(dockerfile, r"^FROM metacubex/mihomo:latest\n")
         compose = (REPO / "docker-compose.yml").read_text(encoding="utf-8")
         self.assertNotRegex(compose, r"mihomo-proxy:v\d+")
 

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -euo pipefail
 
-# Base image (metacubex/mihomo:v1.19.31): Alpine, ENTRYPOINT ["/mihomo"], no CMD.
+# Base image (metacubex/mihomo:latest): Alpine, ENTRYPOINT ["/mihomo"], no CMD.
 # Default config dir is /root/.config/mihomo. We bind-mount ./data at /etc/mihomo
 # and exec the original binary with -d so providers/cache stay on that volume.
 

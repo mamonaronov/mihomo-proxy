@@ -1,7 +1,7 @@
 services:
   mihomo:
     build: .
-    # Local name only. Mihomo version lives in Dockerfile FROM.
+    # Local name only. Base image tag lives in Dockerfile FROM.
     image: mihomo-proxy
     container_name: mihomo-proxy
     restart: unless-stopped
