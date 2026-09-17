@@ -7,3 +7,5 @@ tests
 README.md
 docker-compose.yml
 .dockerignore
+deploy.sh
+deploy

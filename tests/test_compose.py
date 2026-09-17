@@ -51,9 +51,12 @@ class TestComposeAndEntrypoint(unittest.TestCase):
         text = (REPO / ".dockerignore").read_text(encoding="utf-8")
         self.assertIn(".env", text)
         self.assertIn("data", text)
-        self.assertIn("tests", text)
-        self.assertNotIn("config.yaml", text.splitlines())
-        self.assertNotIn("docker-entrypoint.sh", text.splitlines())
+        lines = text.splitlines()
+        self.assertIn("tests", lines)
+        self.assertIn("deploy.sh", lines)
+        self.assertIn("deploy", lines)
+        self.assertNotIn("config.yaml", lines)
+        self.assertNotIn("docker-entrypoint.sh", lines)
 
     def test_readme_has_no_host_mihomo_or_host_network(self) -> None:
         text = (REPO / "README.md").read_text(encoding="utf-8")
@@ -61,7 +64,8 @@ class TestComposeAndEntrypoint(unittest.TestCase):
         self.assertNotIn("network_mode: host", text)
         self.assertNotIn("host network", text.lower())
         self.assertNotIn("8176598712630598761082765412765789012506456781928765078960", text)
-        self.assertIn("docker compose restart", text)
+        self.assertIn("./deploy.sh", text)
+        self.assertIn("git pull --ff-only", text)
 
 
 if __name__ == "__main__":

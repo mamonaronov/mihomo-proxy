@@ -22,31 +22,32 @@ cp .env.example .env
 # Замени MIHOMO_API_SECRET на свой (например: openssl rand -hex 32)
 # С change-me / REPLACE_ME контейнер не стартует
 # URL подписок уже стоят
-docker compose up -d --build
+chmod +x deploy.sh
+./deploy.sh
 ```
 
-Доставка: `git pull`, затем `docker compose restart` (схема) или `docker compose up -d` (`.env`). `--build` нужен только если менялись `Dockerfile` или `docker-entrypoint.sh`. Образ на Docker Hub не публикуется.
+`./deploy.sh` ставит systemd-юнит и поднимает контейнер. Нужен sudo. Образ на Docker Hub не публикуется: локальная сборка `mihomo-proxy` поверх `metacubex/mihomo:latest`.
+
+## Обновление
+
+На сервере:
+
+```bash
+git pull --ff-only
+./deploy.sh
+```
+
+Скрипт тянет новый `metacubex/mihomo:latest`, пересобирает образ и пересоздаёт контейнер (entrypoint заново подставляет yaml из `config.yaml` и `.env`). Без `--pull always` Docker мог бы оставить уже скачанный `latest` в кэше.
 
 ## Смена подписки
 
-Правишь `SUB3_URL` (или другой `SUBn_URL`) в `.env`, затем:
-
-```bash
-docker compose up -d
-```
-
-Entrypoint заново подставит yaml. `--build` не нужен.
+Правишь `SUB3_URL` (или другой `SUBn_URL`) в `.env`, затем `./deploy.sh`. Скрипт `.env` не затирает. Entrypoint заново подставит yaml.
 
 ## Смена схемы групп
 
-Правишь `config.yaml`, коммитишь, на сервере:
+Правишь `config.yaml`, коммитишь, на сервере `git pull --ff-only && ./deploy.sh`.
 
-```bash
-git pull
-docker compose restart
-```
-
-`--build` не нужен: шаблон смонтирован с хоста в `/template/config.yaml`. `restart` заново прогоняет envsubst. Живой конфиг mihomo — это `./data/config.yaml` после подстановки, его в git нет.
+Шаблон смонтирован с хоста в `/template/config.yaml`. Пересоздание контейнера заново прогоняет envsubst. Живой конфиг mihomo — это `./data/config.yaml` после подстановки, его в git нет.
 
 ## Проверка
 
@@ -110,6 +111,8 @@ networks:
 
 | Файл | В git | Назначение |
 |------|-------|------------|
+| `deploy.sh` | да | systemd-юнит и `docker compose up --build --pull always --force-recreate` |
+| `deploy/mihomo-proxy.service` | да | шаблон systemd (WorkingDirectory подставляет скрипт) |
 | `config.yaml` | да | шаблон схемы (монтируется в `/template/config.yaml`), плейсхолдеры `${SUB1_URL}` … `${MIHOMO_API_SECRET}` |
 | `.env.example` | да | образец переменных, публичные URL уже заполнены |
 | `.env` | нет | реальные URL и секрет |
