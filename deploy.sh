@@ -154,7 +154,7 @@ fi
 echo
 echo "done"
 echo "  network      telegram-proxy (alias proxy)"
-echo "  SOCKS        socks5://proxy:11808"
+echo "  SOCKS        socks5h://proxy:11808"
 echo "  API          http://proxy:19090"
 if [[ "$SKIP_DOCKER" -eq 0 ]]; then
   echo "  container    $(docker inspect -f '{{.State.Status}}' mihomo-proxy 2>/dev/null || echo not-created)"

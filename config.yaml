@@ -249,7 +249,7 @@ proxy-groups:
     use:
       - sub3
     url: https://api.telegram.org/bot
-    interval: 120
+    interval: 30
     timeout: 4000
     tolerance: 100
     lazy: false

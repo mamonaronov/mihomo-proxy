@@ -36,6 +36,8 @@ class TestMihomoConfig(unittest.TestCase):
         self.assertIn("max-failed-times: 1", auto)
         self.assertIn("type: url-test", fast)
         self.assertIn("tolerance:", fast)
+        self.assertIn("interval: 30", fast)
+        self.assertNotIn("interval: 120", fast)
         self.assertIn("timeout: 4000", fast)
         self.assertNotIn("timeout: 2500", fast)
         self.assertIn("Anycast", fast)

@@ -5,7 +5,7 @@ SOCKS5-прокси для Telegram-ботов на одном VPS. Это не 
 Боты ходят в контейнер `proxy` в сети `telegram-proxy`:
 
 ```
-TELEGRAM_PROXY_URL=socks5://proxy:11808
+TELEGRAM_PROXY_URL=socks5h://proxy:11808
 MIHOMO_API_URL=http://proxy:19090
 MIHOMO_API_SECRET=<тот же, что в .env этого проекта>
 MIHOMO_PROXY_GROUP=AUTO
@@ -100,7 +100,7 @@ networks:
 
 1. Подними контейнер **рядом** со старым `systemctl`-сервисом (порты контейнера на хост не смотрят, конфликта 11808 не будет).
 2. Проверь сеть командой curl выше.
-3. Переключи бота на `socks5://proxy:11808` и тот же секрет.
+3. Переключи бота на `socks5h://proxy:11808` и тот же секрет.
 4. Выключи хостовый mihomo: `systemctl disable --now mihomo`.
 
 Пакет mihomo на хост ставить не нужно.
