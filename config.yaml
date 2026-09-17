@@ -36,13 +36,18 @@ profile:
 dns:
   enable: true
   ipv6: false
+  # SOCKS bots need real IPs. fake-ip is for TUN on a laptop.
   enhanced-mode: redir-host
-  nameserver:
-    - 8.8.8.8
+  # IP-literal DoH: no UDP/53 bootstrap, so RU hijack cannot poison dns.google.
+  default-nameserver:
     - 1.1.1.1
+    - 8.8.8.8
+  nameserver:
+    - https://1.1.1.1/dns-query
+    - https://8.8.8.8/dns-query
   fallback:
-    - tls://1.1.1.1
-    - tls://8.8.8.8
+    - https://1.0.0.1/dns-query
+    - https://8.8.4.4/dns-query
   fallback-filter:
     geoip: false
 

@@ -91,6 +91,21 @@ class TestMihomoConfig(unittest.TestCase):
         self.assertIn("mixed-port: 11808", text)
         self.assertIn("external-controller: 0.0.0.0:19090", text)
 
+    def test_dns_uses_doh_not_fake_ip(self) -> None:
+        text = CONFIG.read_text(encoding="utf-8")
+        dns = text.split("proxy-providers:", 1)[0].split("\ndns:", 1)[1]
+        active = "\n".join(_active_lines(dns))
+        self.assertIn("enhanced-mode: redir-host", active)
+        self.assertNotIn("enhanced-mode: fake-ip", active)
+        self.assertIn("https://1.1.1.1/dns-query", active)
+        self.assertIn("https://8.8.8.8/dns-query", active)
+        self.assertNotIn("tls://1.1.1.1", active)
+        self.assertNotIn("tls://8.8.8.8", active)
+        nameserver = active.split("\n  nameserver:", 1)[1].split("\n  fallback:", 1)[0]
+        self.assertNotIn("- 8.8.8.8", nameserver)
+        self.assertNotIn("- 1.1.1.1", nameserver)
+        self.assertIn("default-nameserver:", active)
+
 
 if __name__ == "__main__":
     unittest.main()
