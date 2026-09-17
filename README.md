@@ -20,11 +20,12 @@ MIHOMO_PROXY_GROUP=AUTO
 ```bash
 cp .env.example .env
 # Замени MIHOMO_API_SECRET на свой (например: openssl rand -hex 32)
+# С change-me / REPLACE_ME контейнер не стартует
 # URL подписок уже стоят
 docker compose up -d --build
 ```
 
-Доставка обновлений: `git pull && docker compose up -d --build`. Образ на Docker Hub не публикуется.
+Доставка: `git pull`, затем `docker compose restart` (схема) или `docker compose up -d` (`.env`). `--build` нужен только если менялись `Dockerfile` или `docker-entrypoint.sh`. Образ на Docker Hub не публикуется.
 
 ## Смена подписки
 
@@ -42,10 +43,10 @@ Entrypoint заново подставит yaml. `--build` не нужен.
 
 ```bash
 git pull
-docker compose up -d --build
+docker compose restart
 ```
 
-`--build` нужен, потому что шаблон копируется в образ как `/template/config.yaml`. Живой конфиг mihomo — это `./data/config.yaml` после envsubst, его в git нет.
+`--build` не нужен: шаблон смонтирован с хоста в `/template/config.yaml`. `restart` заново прогоняет envsubst. Живой конфиг mihomo — это `./data/config.yaml` после подстановки, его в git нет.
 
 ## Проверка
 
@@ -103,19 +104,13 @@ networks:
 
 Пакет mihomo на хост ставить не нужно.
 
-Если переезжаешь со старого хостового mihomo и не хочешь менять `.env` бота, поставь в `.env` этого проекта тот же секрет, что был в yaml:
-
-```
-8176598712630598761082765412765789012506456781928765078960
-```
-
-Новый инсталл так делать не должен: сгенерируй свой секрет и пропиши его и здесь, и у бота.
+Если переезжаешь со старого хостового mihomo и не хочешь менять `.env` бота, скопируй `secret` из старого yaml в `MIHOMO_API_SECRET` здесь. Новый инсталл так делать не должен: сгенерируй свой секрет и пропиши его и здесь, и у бота.
 
 ## Что где лежит
 
 | Файл | В git | Назначение |
 |------|-------|------------|
-| `config.yaml` | да | шаблон схемы, плейсхолдеры `${SUB1_URL}` … `${MIHOMO_API_SECRET}` |
+| `config.yaml` | да | шаблон схемы (монтируется в `/template/config.yaml`), плейсхолдеры `${SUB1_URL}` … `${MIHOMO_API_SECRET}` |
 | `.env.example` | да | образец переменных, публичные URL уже заполнены |
 | `.env` | нет | реальные URL и секрет |
 | `./data/config.yaml` | нет | runtime после envsubst |

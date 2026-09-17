@@ -25,6 +25,14 @@ if [ "$missing" -ne 0 ]; then
   exit 1
 fi
 
+# A copied .env.example must not go live.
+case "$MIHOMO_API_SECRET" in
+  change-me|CHANGE-ME|changeme|replace-me|REPLACE_ME|replace_me)
+    printf '%s\n' "error: MIHOMO_API_SECRET is a placeholder; generate one (openssl rand -hex 32)" >&2
+    exit 1
+    ;;
+esac
+
 # Optional providers stay commented in the template. envsubst still replaces
 # placeholders inside # lines, so export empty defaults when unset.
 SUB6_URL="${SUB6_URL:-}"

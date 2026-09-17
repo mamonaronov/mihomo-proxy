@@ -1,7 +1,8 @@
 services:
   mihomo:
     build: .
-    image: mihomo-proxy:v1.19.31
+    # Local name only. Mihomo version lives in Dockerfile FROM.
+    image: mihomo-proxy
     container_name: mihomo-proxy
     restart: unless-stopped
     env_file: .env
@@ -10,6 +11,8 @@ services:
       # Base image VOLUME /root/.config/mihomo would otherwise create
       # an anonymous Docker volume under /var/lib/docker/volumes.
       - ./data:/root/.config/mihomo
+      # Overlay the baked-in template so schema edits do not need --build.
+      - ./config.yaml:/template/config.yaml:ro
     networks:
       telegram-proxy:
         aliases:

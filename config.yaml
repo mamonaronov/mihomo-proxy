@@ -3,7 +3,7 @@
 # (${SUB1_URL} … ${SUB5_URL}, ${MIHOMO_API_SECRET}) via entrypoint envsubst.
 # Do not publish mixed-port / API. Host v2rayN keeps 10808/10809.
 #
-# Update schema: commit yaml, git pull, compose up --build
+# Update schema: commit yaml, git pull, docker compose restart
 # Update subscription URL: edit .env, docker compose up -d  (no yaml commit)
 #
 # FAST = url-test(sub3). BACKUP = fallback(sub1,sub2). AUTO = fallback(FAST,BACKUP).

@@ -79,6 +79,7 @@ class TestMihomoConfig(unittest.TestCase):
         text = CONFIG.read_text(encoding="utf-8")
         self.assertNotIn("raw.githubusercontent.com", text)
         self.assertNotIn("8176598712630598761082765412765789012506456781928765078960", text)
+        self.assertNotIn("compose up --build", text)
         self.assertIn('secret: "${MIHOMO_API_SECRET}"', text)
         for n in range(1, 9):
             self.assertIn(f'url: "${{SUB{n}_URL}}"', text)
