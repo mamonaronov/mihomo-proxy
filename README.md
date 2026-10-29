@@ -28,6 +28,15 @@ chmod +x deploy.sh
 
 `./deploy.sh` ставит systemd-юнит и поднимает контейнер. Нужен sudo. Образ на Docker Hub не публикуется: локальная сборка `mihomo-proxy` поверх `metacubex/mihomo:latest`.
 
+Один запуск без автостарта после перезагрузки:
+
+```bash
+./deploy.sh --once
+# то же самое: ./deploy.sh -o
+```
+
+Юнит `mihomo-proxy.service` не создаётся. Контейнер стартует с `restart: "no"`, поэтому Docker после ребута его не поднимает. Уже установленный юнит эта команда не трогает — его снимает `./down.sh`.
+
 ## Обновление
 
 На сервере:
@@ -111,7 +120,7 @@ networks:
 
 | Файл | В git | Назначение |
 |------|-------|------------|
-| `deploy.sh` | да | systemd-юнит и `docker compose up --build --pull always --force-recreate` |
+| `deploy.sh` | да | systemd-юнит и `docker compose up --build --pull always --force-recreate`. `--once` / `-o` — только этот запуск, без юнита и без автостарта Docker |
 | `deploy/mihomo-proxy.service` | да | шаблон systemd (WorkingDirectory подставляет скрипт) |
 | `config.yaml` | да | шаблон схемы (монтируется в `/template/config.yaml`), плейсхолдеры `${SUB1_URL}` … `${MIHOMO_API_SECRET}` |
 | `.env.example` | да | образец переменных, публичные URL уже заполнены |

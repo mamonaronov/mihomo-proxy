@@ -32,6 +32,21 @@ class TestDeploy(unittest.TestCase):
         self.assertIn("mihomo-proxy.service", text)
         self.assertIn("does not change .env", text.lower())
 
+    def test_deploy_once_does_not_survive_reboot(self) -> None:
+        text = (REPO / "deploy.sh").read_text(encoding="utf-8")
+        self.assertRegex(text, r"--once\|-o\)")
+        self.assertIn('restart: "no"', text)
+        self.assertNotIn("remove_systemd_unit", text)
+        self.assertNotIn("systemctl disable", text)
+        self.assertNotIn("systemctl stop", text)
+        self.assertIn("./down.sh", text)
+        self.assertIn("--once cannot be combined with --skip-docker", text)
+        marker = 'if [[ "$ONCE" -eq 1 ]]; then'
+        once_arm, persistent_arm = text.split(marker, 1)[1].split("\nelse\n", 1)
+        self.assertNotIn("systemctl enable", once_arm)
+        self.assertNotIn("install -m 644", once_arm)
+        self.assertIn("systemctl enable mihomo-proxy.service", persistent_arm)
+
     def test_deploy_sh_does_not_fetch_git(self) -> None:
         text = (REPO / "deploy.sh").read_text(encoding="utf-8")
         self.assertNotIn("git fetch", text)

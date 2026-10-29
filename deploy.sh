@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 # Apply systemd unit, then pull/build and start the proxy container.
+# --once / -o starts the container for this boot only.
 # Does not install a host mihomo package. Does not change .env.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 SKIP_DOCKER=0
+ONCE=0
+UNIT="mihomo-proxy.service"
+UNIT_PATH="/etc/systemd/system/${UNIT}"
 
 usage() {
   cat <<EOF
-Usage: $(basename "$0") [--skip-docker]
+Usage: $(basename "$0") [--skip-docker] [--once|-o]
 
 Applies configs from the repository:
 
@@ -23,12 +27,18 @@ Does not install mihomo on the host and does not change .env.
 To update later: git pull --ff-only && ./deploy.sh
 
   --skip-docker   only install the systemd unit, do not touch the container
+  --once, -o      this boot only. Skip installing ${UNIT}.
+                  Start the container with restart policy "no", so Docker
+                  does not start it again after a reboot.
+                  An already installed unit is left in place; remove it
+                  with ./down.sh.
 EOF
 }
 
 for arg in "$@"; do
   case "$arg" in
     --skip-docker) SKIP_DOCKER=1 ;;
+    --once|-o) ONCE=1 ;;
     -h|--help)
       usage
       exit 0
@@ -40,6 +50,12 @@ for arg in "$@"; do
       ;;
   esac
 done
+
+if [[ "$ONCE" -eq 1 && "$SKIP_DOCKER" -eq 1 ]]; then
+  echo "error: --once cannot be combined with --skip-docker" >&2
+  usage >&2
+  exit 1
+fi
 
 need_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -73,11 +89,17 @@ run_sudo() {
   fi
 }
 
+need_root() {
+  if [[ "$(id -u)" -ne 0 ]] && ! command -v sudo >/dev/null 2>&1; then
+    echo "error: $1" >&2
+    exit 1
+  fi
+}
+
 need_cmd docker
-need_cmd systemctl
-if [[ "$(id -u)" -ne 0 ]] && ! command -v sudo >/dev/null 2>&1; then
-  echo "error: need root or sudo to install the systemd unit" >&2
-  exit 1
+if [[ "$ONCE" -eq 0 ]]; then
+  need_cmd systemctl
+  need_root "need root or sudo to install the systemd unit"
 fi
 
 if [[ ! -f "$ROOT/.env" ]]; then
@@ -124,31 +146,55 @@ else
 fi
 echo "==> git commit ${git_commit} ${git_title}"
 
-echo "==> installing mihomo-proxy.service (WorkingDirectory=$ROOT)"
-docker_bin="$(command -v docker)"
-unit_tmp="$(mktemp)"
-awk -v wd="$ROOT" -v docker="$docker_bin" '
-  /^WorkingDirectory=/ { print "WorkingDirectory=" wd; next }
-  /^ExecStart=/ { print "ExecStart=" docker " compose up -d"; next }
-  /^ExecStop=/ { print "ExecStop=" docker " compose stop"; next }
-  { print }
-' "$ROOT/deploy/mihomo-proxy.service" > "$unit_tmp"
-run_sudo install -m 644 "$unit_tmp" /etc/systemd/system/mihomo-proxy.service
-rm -f "$unit_tmp"
+if [[ "$ONCE" -eq 1 ]]; then
+  echo "==> once: this boot only (no systemd unit, restart policy no)"
+else
+  echo "==> installing mihomo-proxy.service (WorkingDirectory=$ROOT)"
+  docker_bin="$(command -v docker)"
+  unit_tmp="$(mktemp)"
+  awk -v wd="$ROOT" -v docker="$docker_bin" '
+    /^WorkingDirectory=/ { print "WorkingDirectory=" wd; next }
+    /^ExecStart=/ { print "ExecStart=" docker " compose up -d"; next }
+    /^ExecStop=/ { print "ExecStop=" docker " compose stop"; next }
+    { print }
+  ' "$ROOT/deploy/mihomo-proxy.service" > "$unit_tmp"
+  run_sudo install -m 644 "$unit_tmp" "$UNIT_PATH"
+  rm -f "$unit_tmp"
 
-echo "==> systemd daemon-reload"
-run_sudo systemctl daemon-reload
-run_sudo systemctl enable mihomo-proxy.service
+  echo "==> systemd daemon-reload"
+  run_sudo systemctl daemon-reload
+  run_sudo systemctl enable mihomo-proxy.service
+fi
 
 if [[ "$SKIP_DOCKER" -eq 1 ]]; then
   echo "==> skip docker"
 else
   echo "==> docker compose up -d --build --pull always --force-recreate"
+  compose_files=(-f "$ROOT/docker-compose.yml")
+  restart_override=""
+  if [[ "$ONCE" -eq 1 ]]; then
+    restart_override="$(mktemp)"
+    cat >"$restart_override" <<'EOF'
+services:
+  mihomo:
+    restart: "no"
+EOF
+    compose_files+=(-f "$restart_override")
+  fi
+  compose_status=0
   (
     cd "$ROOT"
-    docker compose up -d --build --pull always --force-recreate
-  )
-  run_sudo systemctl start mihomo-proxy.service
+    docker compose --project-directory "$ROOT" "${compose_files[@]}" up -d --build --pull always --force-recreate
+  ) || compose_status=$?
+  if [[ -n "$restart_override" ]]; then
+    rm -f "$restart_override"
+  fi
+  if [[ "$compose_status" -ne 0 ]]; then
+    exit "$compose_status"
+  fi
+  if [[ "$ONCE" -eq 0 ]]; then
+    run_sudo systemctl start mihomo-proxy.service
+  fi
 fi
 
 echo
@@ -156,6 +202,9 @@ echo "done"
 echo "  network      telegram-proxy (alias proxy)"
 echo "  SOCKS        socks5h://proxy:11808"
 echo "  API          http://proxy:19090"
+if [[ "$ONCE" -eq 1 ]]; then
+  echo "  boot         stays down after reboot"
+fi
 if [[ "$SKIP_DOCKER" -eq 0 ]]; then
   echo "  container    $(docker inspect -f '{{.State.Status}}' mihomo-proxy 2>/dev/null || echo not-created)"
 fi
