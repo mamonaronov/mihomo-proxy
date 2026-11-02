@@ -25,12 +25,11 @@ mode: rule
 log-level: info
 ipv6: false
 unified-delay: true
-tcp-concurrent: true
+tcp-concurrent: false
 keep-alive-interval: 15
 find-process-mode: off
 geodata-mode: false
 geo-auto-update: false
-global-client-fingerprint: chrome
 
 external-controller: 0.0.0.0:19090
 secret: "${MIHOMO_API_SECRET}"

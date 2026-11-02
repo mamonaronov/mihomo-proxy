@@ -119,6 +119,14 @@ class TestMihomoConfig(unittest.TestCase):
         self.assertIn("mixed-port: 11808", text)
         self.assertIn("external-controller: 0.0.0.0:19090", text)
 
+    def test_fingerprint_is_per_proxy_and_dials_are_sequential(self) -> None:
+        text = CONFIG.read_text(encoding="utf-8")
+        active = "\n".join(_active_lines(text))
+        self.assertNotIn("global-client-fingerprint", active)
+        self.assertNotIn("client-fingerprint:", active)
+        self.assertIn("tcp-concurrent: false", active)
+        self.assertNotIn("tcp-concurrent: true", active)
+
     def test_dns_uses_doh_not_fake_ip(self) -> None:
         text = CONFIG.read_text(encoding="utf-8")
         dns = text.split("proxy-providers:", 1)[0].split("\ndns:", 1)[1]
