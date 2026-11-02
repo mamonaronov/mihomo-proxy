@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -34,12 +36,44 @@ class TestComposeAndEntrypoint(unittest.TestCase):
         self.assertIn("set -euo pipefail", text)
         self.assertIn("exec /mihomo", text)
         self.assertIn(
-            "envsubst '${SUB1_URL} ${SUB2_URL} ${SUB3_URL} ${SUB4_URL} ${SUB5_URL} ${SUB6_URL} ${SUB7_URL} ${SUB8_URL} ${MIHOMO_API_SECRET}'",
+            "envsubst '${SUB1_URL} ${SUB2_URL} ${SUB3_URL} ${SUB4_URL} ${SUB5_URL} ${SUB6_URL} ${SUB7_URL} ${SUB8_URL} ${PAID_URL} ${MIHOMO_API_SECRET}'",
             text,
         )
         self.assertIn("change-me", text)
         self.assertIn("REPLACE_ME", text)
         self.assertIn("is a placeholder", text)
+        self.assertIn(
+            "for var in SUB1_URL SUB2_URL SUB3_URL SUB4_URL SUB5_URL MIHOMO_API_SECRET; do",
+            text,
+        )
+        self.assertNotIn("SUB5_URL PAID_URL", text)
+        self.assertIn('if [ -z "$PAID_URL" ]; then', text)
+
+    def test_empty_paid_url_drops_paid_blocks(self) -> None:
+        entry = (REPO / "docker-entrypoint.sh").read_text(encoding="utf-8")
+        deploy = (REPO / "deploy.sh").read_text(encoding="utf-8")
+        self.assertIn("for var in SUB1_URL SUB2_URL SUB3_URL SUB4_URL SUB5_URL; do", deploy)
+        self.assertNotIn("SUB5_URL PAID_URL", deploy)
+        start = entry.index("drop_paid_blocks()")
+        func = entry[start : entry.index("\n}\n", start) + 3]
+        template = (REPO / "config.yaml").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp:
+            src = Path(tmp) / "in.yaml"
+            dst = Path(tmp) / "out.yaml"
+            src.write_text(template, encoding="utf-8")
+            subprocess.check_call(["sh", "-c", func + f'\ndrop_paid_blocks "{src}" "{dst}"\n'])
+            out = dst.read_text(encoding="utf-8")
+        self.assertNotIn("Платная", out)
+        self.assertNotIn("- name: PAID", out)
+        self.assertNotIn("- PAID", out)
+        self.assertFalse(any(line.strip() == "# paid-begin" for line in out.splitlines()))
+        self.assertFalse(any(line.strip() == "# paid-end" for line in out.splitlines()))
+        self.assertIn("- name: FREE", out)
+        self.assertIn("- name: AUTO", out)
+        self.assertIn("MATCH,AUTO", out)
+        auto = out.split("- name: AUTO", 1)[1].split("- name: SUBSCRIBE", 1)[0]
+        self.assertIn("- FREE", auto)
+        self.assertIn('url: "${SUB1_URL}"', out)
 
     def test_dockerfile_is_the_only_mihomo_base_tag(self) -> None:
         dockerfile = (REPO / "Dockerfile").read_text(encoding="utf-8")

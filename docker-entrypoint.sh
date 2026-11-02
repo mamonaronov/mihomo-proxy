@@ -35,22 +35,63 @@ esac
 
 # Optional providers stay commented in the template. envsubst still replaces
 # placeholders inside # lines, so export empty defaults when unset.
+# PAID_URL is optional: empty means drop the paid blocks and run on FREE only.
 SUB6_URL="${SUB6_URL:-}"
 SUB7_URL="${SUB7_URL:-}"
 SUB8_URL="${SUB8_URL:-}"
+PAID_URL="${PAID_URL:-}"
+PAID_URL="${PAID_URL#"${PAID_URL%%[![:space:]]*}"}"
+PAID_URL="${PAID_URL%"${PAID_URL##*[![:space:]]}"}"
 export SUB1_URL SUB2_URL SUB3_URL SUB4_URL SUB5_URL
 export SUB6_URL SUB7_URL SUB8_URL
+export PAID_URL
 export MIHOMO_API_SECRET
 
 mkdir -p /etc/mihomo/providers
 
-envsubst '${SUB1_URL} ${SUB2_URL} ${SUB3_URL} ${SUB4_URL} ${SUB5_URL} ${SUB6_URL} ${SUB7_URL} ${SUB8_URL} ${MIHOMO_API_SECRET}' \
+envsubst '${SUB1_URL} ${SUB2_URL} ${SUB3_URL} ${SUB4_URL} ${SUB5_URL} ${SUB6_URL} ${SUB7_URL} ${SUB8_URL} ${PAID_URL} ${MIHOMO_API_SECRET}' \
   < "$TEMPLATE" > "$RUNTIME"
 
-if grep -E '\$\{(SUB[1-5]_URL|MIHOMO_API_SECRET)\}' "$RUNTIME" >/dev/null; then
+if grep -E '\$\{(SUB[1-5]_URL|PAID_URL|MIHOMO_API_SECRET)\}' "$RUNTIME" >/dev/null; then
   printf '%s\n' "error: unsubstituted placeholders remain in $RUNTIME" >&2
-  grep -E '\$\{(SUB[1-5]_URL|MIHOMO_API_SECRET)\}' "$RUNTIME" >&2 || true
+  grep -E '\$\{(SUB[1-5]_URL|PAID_URL|MIHOMO_API_SECRET)\}' "$RUNTIME" >&2 || true
   exit 1
+fi
+
+# Drop "# paid-begin" … "# paid-end" when no paid subscription is configured.
+drop_paid_blocks() {
+  infile="$1"
+  outfile="$2"
+  awk '
+    /^[[:space:]]*# paid-begin[[:space:]]*$/ { skip = 1; depth++; next }
+    /^[[:space:]]*# paid-end[[:space:]]*$/ {
+      if (depth == 0) {
+        printf "%s\n", "error: paid-end without paid-begin" > "/dev/stderr"
+        exit 1
+      }
+      depth--
+      skip = 0
+      next
+    }
+    skip { next }
+    { print }
+    END {
+      if (depth != 0) {
+        printf "%s\n", "error: unclosed paid-begin block" > "/dev/stderr"
+        exit 1
+      }
+    }
+  ' "$infile" > "$outfile"
+}
+
+if [ -z "$PAID_URL" ]; then
+  paid_tmp="${RUNTIME}.nopaid"
+  drop_paid_blocks "$RUNTIME" "$paid_tmp"
+  mv "$paid_tmp" "$RUNTIME"
+  if grep -F "Платная" "$RUNTIME" >/dev/null || grep -E '^[[:space:]]*- PAID[[:space:]]*$' "$RUNTIME" >/dev/null; then
+    printf '%s\n' "error: paid subscription blocks remained though PAID_URL is empty" >&2
+    exit 1
+  fi
 fi
 
 if grep -Eq '^secret:[[:space:]]*""[[:space:]]*$' "$RUNTIME"; then

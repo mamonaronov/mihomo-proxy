@@ -21,26 +21,59 @@ def _active_lines(text: str) -> list[str]:
 
 
 class TestMihomoConfig(unittest.TestCase):
-    def test_mihomo_auto_is_urltest_of_all_live_providers(self) -> None:
+    def test_auto_uses_free_then_paid(self) -> None:
         text = CONFIG.read_text(encoding="utf-8")
+        free = _mihomo_group(text, "FREE")
+        paid = _mihomo_group(text, "PAID")
         auto = _mihomo_group(text, "AUTO")
-        self.assertIn("type: url-test", auto)
-        self.assertNotIn("type: fallback", auto)
-        self.assertNotIn("include-all-providers:", auto)
-        self.assertIn("url: https://api.telegram.org/bot", auto)
-        self.assertIn("expected-status: 404", auto)
-        self.assertIn("max-failed-times: 1", auto)
-        self.assertIn("tolerance:", auto)
-        self.assertIn("interval: 30", auto)
-        self.assertNotIn("interval: 120", auto)
-        self.assertIn("timeout: 4000", auto)
-        self.assertNotIn("timeout: 2500", auto)
-        self.assertIn("lazy: false", auto)
-        self.assertIn("Anycast", auto)
-        self.assertNotIn("Singapore", auto)
-        auto_use = auto.split("use:", 1)[1].split("url:", 1)[0]
+        self.assertIn("type: url-test", free)
+        self.assertNotIn("type: fallback", free)
+        self.assertNotIn("include-all-providers:", free)
+        self.assertIn("url: https://api.telegram.org/bot", free)
+        self.assertIn("expected-status: 404", free)
+        self.assertIn("max-failed-times: 1", free)
+        self.assertIn("tolerance:", free)
+        self.assertIn("interval: 30", free)
+        self.assertNotIn("interval: 120", free)
+        self.assertIn("timeout: 4000", free)
+        self.assertNotIn("timeout: 2500", free)
+        self.assertIn("lazy: false", free)
+        self.assertIn("Anycast", free)
+        self.assertNotIn("Singapore", free)
+        names = (
+            "🏴 ЧЕРНЫЕ СПИСКИ 🏴 BLACK LISTS | Полная • Full | VLESS",
+            "🏴 ЧЕРНЫЕ СПИСКИ 🏴 BLACK LISTS | Полная • Full | SS, Hy2, Vmess, Trojan",
+            "🏴 ЧЕРНЫЕ СПИСКИ 🏴 BLACK LISTS | Mobile-150",
+            "🏳️ БЕЛЫЕ СПИСКИ 🏳️ WHITE LISTS | CIDR | Полная • Full",
+            "🏳️ БЕЛЫЕ СПИСКИ 🏳️ WHITE LISTS | SNI-RU",
+        )
+        free_use = free.split("use:", 1)[1].split("url:", 1)[0]
+        for name in names:
+            self.assertIn(f'- "{name}"', free_use)
+            self.assertIn(f'  "{name}":', text)
+            self.assertIn(f'additional-prefix: "{name} | "', text)
+            self.assertNotIn(name, paid)
         for sub in ("sub1", "sub2", "sub3", "sub4", "sub5"):
-            self.assertIn(f"- {sub}", auto_use)
+            self.assertNotIn(f"\n  {sub}:\n", text)
+            self.assertNotIn(f"- {sub}\n", free_use)
+        self.assertIn("type: url-test", paid)
+        self.assertIn("lazy: false", paid)
+        self.assertNotIn("lazy: true", paid)
+        self.assertIn("interval: 60", paid)
+        self.assertIn('use:\n      - "Платная"', paid)
+        self.assertIn('url: "${PAID_URL}"', text)
+        begin = [line for line in text.splitlines() if line.strip() == "# paid-begin"]
+        end = [line for line in text.splitlines() if line.strip() == "# paid-end"]
+        self.assertEqual(len(begin), 3)
+        self.assertEqual(len(end), 3)
+        self.assertIn('additional-prefix: "Платная | "', text)
+        self.assertIn("path: ./providers/paid.yaml", text)
+        self.assertIn("type: fallback", auto)
+        self.assertNotIn("type: url-test", auto)
+        self.assertNotIn("tolerance:", auto)
+        self.assertNotIn("use:", auto)
+        auto_proxies = auto.split("proxies:", 1)[1].split("url:", 1)[0]
+        self.assertLess(auto_proxies.find("- FREE"), auto_proxies.find("- PAID"))
         self.assertNotIn("- name: FAST", text)
         self.assertNotIn("- name: BACKUP", text)
         self.assertNotIn("- name: WHITELIST", text)
@@ -50,10 +83,19 @@ class TestMihomoConfig(unittest.TestCase):
         self.assertNotIn("WHITELIST", proxy)
         self.assertIn("MATCH,AUTO", text)
         self.assertIn("interval: 300", text)
+        paid_provider = text.split('  "Платная":', 1)[1].split("# paid-end", 1)[0]
+        self.assertIn("\n      interval: 60\n", paid_provider)
+        self.assertIn("lazy: false", paid_provider)
+        self.assertNotIn("lazy: true", paid_provider)
         self.assertEqual(text.count("lazy: true"), 5)
+        self.assertEqual(
+            sum(1 for line in _active_lines(text) if line.strip() == "interval: 900"),
+            6,
+        )
+        self.assertNotIn("interval: 3600", "\n".join(_active_lines(text)))
         self.assertNotIn("    proxy: AUTO\n", text)
         self.assertEqual(sum(1 for line in _active_lines(text) if line.strip() == "proxy: DIRECT"), 0)
-        self.assertEqual(sum(1 for line in _active_lines(text) if line.strip() == "proxy: SUBSCRIBE"), 5)
+        self.assertEqual(sum(1 for line in _active_lines(text) if line.strip() == "proxy: SUBSCRIBE"), 6)
         subscribe = _mihomo_group(text, "SUBSCRIBE")
         self.assertIn("type: fallback", subscribe)
         self.assertIn("- DIRECT", subscribe)
@@ -70,6 +112,7 @@ class TestMihomoConfig(unittest.TestCase):
         self.assertIn('secret: "${MIHOMO_API_SECRET}"', text)
         for n in range(1, 9):
             self.assertIn(f'url: "${{SUB{n}_URL}}"', text)
+        self.assertIn('url: "${PAID_URL}"', text)
         self.assertNotIn("REPLACE_ME", text)
         self.assertIn('bind-address: "*"', text)
         self.assertIn("allow-lan: true", text)

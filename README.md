@@ -13,7 +13,7 @@ MIHOMO_PROXY_GROUP=AUTO
 
 Порты на хост не публикуются. На той же машине может стоять v2rayN на 10808/10809 — конфликта не будет.
 
-Схема обхода (группа AUTO = url-test по sub1…sub5, правила) лежит в git. Ссылки подписок и секрет API — только в `.env` (в git не попадает).
+Схема обхода лежит в git. `AUTO` — fallback: сначала `FREE` (url-test бесплатных), и только если они не отвечают — `PAID` (платная подписка с лимитом). В имени провайдера и в префиксе узла стоит название подписки, не `sub1`…`sub5`. Ссылки подписок и секрет API — только в `.env` (в git не попадает).
 
 ## Первый запуск
 
@@ -21,7 +21,8 @@ MIHOMO_PROXY_GROUP=AUTO
 cp .env.example .env
 # Замени MIHOMO_API_SECRET на свой (например: openssl rand -hex 32)
 # С change-me / REPLACE_ME контейнер не стартует
-# URL подписок уже стоят
+# URL бесплатных подписок уже стоят
+# PAID_URL можно оставить пустым — контейнер запустится без платной
 chmod +x deploy.sh
 ./deploy.sh
 ```
@@ -50,11 +51,13 @@ git pull --ff-only
 
 ## Смена подписки
 
-Правишь `SUB3_URL` (или другой `SUBn_URL`) в `.env`, затем `./deploy.sh`. Скрипт `.env` не затирает. Entrypoint заново подставит yaml.
+Правишь `SUB3_URL` (или другой `SUBn_URL`) в `.env`, затем `./deploy.sh`. Платную меняешь через `PAID_URL`. Скрипт `.env` не затирает. Entrypoint заново подставит yaml.
+
+`PAID_URL` можно не задавать: контейнер запускается, а `AUTO` остаётся только на `FREE`. Если ссылка есть, платная не входит в url-test бесплатных. Пока `FREE` проходит проверку Bot API, боты остаются на нём. Когда бесплатные мертвы, `AUTO` переключается на `PAID` и возвращается на `FREE`, как только тот снова жив. Узлы платной подписки проверяются каждую минуту, без lazy.
 
 ## Смена схемы групп
 
-Правишь `config.yaml`, коммитишь, на сервере `git pull --ff-only && ./deploy.sh`.
+Правишь `config.yaml` (в том числе название подписки у провайдера и префикс узлов), коммитишь, на сервере `git pull --ff-only && ./deploy.sh`.
 
 Шаблон смонтирован с хоста в `/template/config.yaml`. Пересоздание контейнера заново прогоняет envsubst. Живой конфиг mihomo — это `./data/config.yaml` после подстановки, его в git нет.
 
@@ -122,7 +125,7 @@ networks:
 |------|-------|------------|
 | `deploy.sh` | да | systemd-юнит и `docker compose up --build --pull always --force-recreate`. `--once` / `-o` — только этот запуск, без юнита и без автостарта Docker |
 | `deploy/mihomo-proxy.service` | да | шаблон systemd (WorkingDirectory подставляет скрипт) |
-| `config.yaml` | да | шаблон схемы (монтируется в `/template/config.yaml`), плейсхолдеры `${SUB1_URL}` … `${MIHOMO_API_SECRET}` |
+| `config.yaml` | да | шаблон схемы (монтируется в `/template/config.yaml`), плейсхолдеры `${SUB1_URL}` … `${PAID_URL}`, `${MIHOMO_API_SECRET}` |
 | `.env.example` | да | образец переменных, публичные URL уже заполнены |
 | `.env` | нет | реальные URL и секрет |
 | `./data/config.yaml` | нет | runtime после envsubst |

@@ -1,12 +1,18 @@
 # Mihomo (Clash Meta) — SOCKS for Telegram bots in Docker.
 # Schema only: subscription URLs and API secret come from .env
-# (${SUB1_URL} … ${SUB5_URL}, ${MIHOMO_API_SECRET}) via entrypoint envsubst.
+# (${SUB1_URL} … ${SUB5_URL}, ${PAID_URL}, ${MIHOMO_API_SECRET}) via entrypoint envsubst.
 # Do not publish mixed-port / API. Host v2rayN keeps 10808/10809.
 #
 # Update schema: commit yaml, git pull, docker compose restart
 # Update subscription URL: edit .env, docker compose up -d  (no yaml commit)
 #
-# AUTO = url-test(sub1+sub2+sub3+sub4+sub5). No FAST/BACKUP split, no WHITELIST.
+# Provider key and node prefix are the subscription profile-title.
+# Cache files stay ./providers/subN.yaml. If SUBn_URL changes, update that title too.
+# FREE = url-test of the five free subscriptions.
+# PAID = url-test of the limited paid plan (${PAID_URL}). Optional.
+# Empty PAID_URL: entrypoint drops the marked paid blocks, and AUTO keeps only FREE.
+# Set PAID_URL: paid carries traffic only when FREE is down.
+# No FAST/BACKUP/WHITELIST groups.
 # Region exclude is off — Anycast and expire rows only. Bot API health: HTTP 404.
 # Providers use SUBSCRIBE: DIRECT first, AUTO if GitHub is blocked.
 # Do not point providers at AUTO alone — deadlock when the tunnel is down.
@@ -52,7 +58,7 @@ dns:
     geoip: false
 
 proxy-providers:
-  sub1:
+  "🏴 ЧЕРНЫЕ СПИСКИ 🏴 BLACK LISTS | Полная • Full | VLESS":
     type: http
     url: "${SUB1_URL}"
     path: ./providers/sub1.yaml
@@ -72,11 +78,11 @@ proxy-providers:
       lazy: true
       expected-status: 204
     override:
-      additional-prefix: "s1 | "
+      additional-prefix: "🏴 ЧЕРНЫЕ СПИСКИ 🏴 BLACK LISTS | Полная • Full | VLESS | "
       udp: true
     exclude-filter: "(?i)expire|expiring|traffic|remain|剩余|流量|过期|官网|套餐|到期|重置|订阅"
 
-  sub2:
+  "🏴 ЧЕРНЫЕ СПИСКИ 🏴 BLACK LISTS | Полная • Full | SS, Hy2, Vmess, Trojan":
     type: http
     url: "${SUB2_URL}"
     path: ./providers/sub2.yaml
@@ -96,11 +102,11 @@ proxy-providers:
       lazy: true
       expected-status: 204
     override:
-      additional-prefix: "s2 | "
+      additional-prefix: "🏴 ЧЕРНЫЕ СПИСКИ 🏴 BLACK LISTS | Полная • Full | SS, Hy2, Vmess, Trojan | "
       udp: true
     exclude-filter: "(?i)expire|expiring|traffic|remain|剩余|流量|过期|官网|套餐|到期|重置|订阅"
 
-  sub3:
+  "🏴 ЧЕРНЫЕ СПИСКИ 🏴 BLACK LISTS | Mobile-150":
     type: http
     url: "${SUB3_URL}"
     path: ./providers/sub3.yaml
@@ -120,15 +126,15 @@ proxy-providers:
       lazy: true
       expected-status: 204
     override:
-      additional-prefix: "s3 | "
+      additional-prefix: "🏴 ЧЕРНЫЕ СПИСКИ 🏴 BLACK LISTS | Mobile-150 | "
       udp: true
     exclude-filter: "(?i)expire|expiring|traffic|remain|剩余|流量|过期|官网|套餐|到期|重置|订阅"
 
-  sub4:
+  "🏳️ БЕЛЫЕ СПИСКИ 🏳️ WHITE LISTS | CIDR | Полная • Full":
     type: http
     url: "${SUB4_URL}"
     path: ./providers/sub4.yaml
-    interval: 3600
+    interval: 900
     size-limit: 10485760
     proxy: SUBSCRIBE
     header:
@@ -144,15 +150,15 @@ proxy-providers:
       lazy: true
       expected-status: 204
     override:
-      additional-prefix: "s4 | "
+      additional-prefix: "🏳️ БЕЛЫЕ СПИСКИ 🏳️ WHITE LISTS | CIDR | Полная • Full | "
       udp: true
     exclude-filter: "(?i)expire|expiring|traffic|remain|剩余|流量|过期|官网|套餐|到期|重置|订阅"
 
-  sub5:
+  "🏳️ БЕЛЫЕ СПИСКИ 🏳️ WHITE LISTS | SNI-RU":
     type: http
     url: "${SUB5_URL}"
     path: ./providers/sub5.yaml
-    interval: 3600
+    interval: 900
     size-limit: 10485760
     proxy: SUBSCRIBE
     header:
@@ -168,15 +174,42 @@ proxy-providers:
       lazy: true
       expected-status: 204
     override:
-      additional-prefix: "s5 | "
+      additional-prefix: "🏳️ БЕЛЫЕ СПИСКИ 🏳️ WHITE LISTS | SNI-RU | "
       udp: true
     exclude-filter: "(?i)expire|expiring|traffic|remain|剩余|流量|过期|官网|套餐|到期|重置|订阅"
+
+  # paid-begin
+  # Limited paid plan from PAID_URL. Not a member of FREE.
+  "Платная":
+    type: http
+    url: "${PAID_URL}"
+    path: ./providers/paid.yaml
+    interval: 900
+    size-limit: 10485760
+    proxy: SUBSCRIBE
+    header:
+      User-Agent:
+        - "clash.meta"
+        - "mihomo"
+        - "clash-verge"
+    health-check:
+      enable: true
+      url: https://www.gstatic.com/generate_204
+      interval: 60
+      timeout: 4000
+      lazy: false
+      expected-status: 204
+    override:
+      additional-prefix: "Платная | "
+      udp: true
+    exclude-filter: "(?i)expire|expiring|traffic|remain|剩余|流量|过期|官网|套餐|到期|重置|订阅"
+  # paid-end
 
   # sub6:
   #   type: http
   #   url: "${SUB6_URL}"
   #   path: ./providers/sub6.yaml
-  #   interval: 3600
+  #   interval: 900
   #   size-limit: 10485760
   #   proxy: SUBSCRIBE
   #   header:
@@ -200,7 +233,7 @@ proxy-providers:
   #   type: http
   #   url: "${SUB7_URL}"
   #   path: ./providers/sub7.yaml
-  #   interval: 3600
+  #   interval: 900
   #   size-limit: 10485760
   #   proxy: SUBSCRIBE
   #   header:
@@ -224,7 +257,7 @@ proxy-providers:
   #   type: http
   #   url: "${SUB8_URL}"
   #   path: ./providers/sub8.yaml
-  #   interval: 3600
+  #   interval: 900
   #   size-limit: 10485760
   #   proxy: SUBSCRIBE
   #   header:
@@ -247,16 +280,15 @@ proxy-providers:
 proxy-groups:
   # Real Bot API: GET /bot is 404 JSON. 200/301/302 matches DPI redirects.
   # Provider health-checks still use gstatic for general liveness.
-  # All live providers compete in AUTO; url-test should drop nodes that
-  # look fast on Google/DPI but cannot carry Bot API.
-  - name: AUTO
+  # FREE drops nodes that look fast on Google/DPI but cannot carry Bot API.
+  - name: FREE
     type: url-test
     use:
-      - sub1
-      - sub2
-      - sub3
-      - sub4
-      - sub5
+      - "🏴 ЧЕРНЫЕ СПИСКИ 🏴 BLACK LISTS | Полная • Full | VLESS"
+      - "🏴 ЧЕРНЫЕ СПИСКИ 🏴 BLACK LISTS | Полная • Full | SS, Hy2, Vmess, Trojan"
+      - "🏴 ЧЕРНЫЕ СПИСКИ 🏴 BLACK LISTS | Mobile-150"
+      - "🏳️ БЕЛЫЕ СПИСКИ 🏳️ WHITE LISTS | CIDR | Полная • Full"
+      - "🏳️ БЕЛЫЕ СПИСКИ 🏳️ WHITE LISTS | SNI-RU"
     url: https://api.telegram.org/bot
     interval: 30
     timeout: 4000
@@ -265,6 +297,37 @@ proxy-groups:
     max-failed-times: 1
     expected-status: 404
     exclude-filter: "(?i)expire|expiring|traffic|remain|剩余|流量|过期|官网|套餐|到期|重置|订阅|Anycast"
+
+  # paid-begin
+  # Every paid node is health-checked every minute, including while FREE is up.
+  - name: PAID
+    type: url-test
+    use:
+      - "Платная"
+    url: https://api.telegram.org/bot
+    interval: 60
+    timeout: 4000
+    tolerance: 100
+    lazy: false
+    max-failed-times: 1
+    expected-status: 404
+    exclude-filter: "(?i)expire|expiring|traffic|remain|剩余|流量|过期|官网|套餐|到期|重置|订阅|Anycast"
+  # paid-end
+
+  # First alive wins. Bots and MATCH stay on AUTO.
+  - name: AUTO
+    type: fallback
+    proxies:
+      - FREE
+      # paid-begin
+      - PAID
+      # paid-end
+    url: https://api.telegram.org/bot
+    expected-status: 404
+    interval: 30
+    timeout: 4000
+    lazy: false
+    max-failed-times: 1
 
   - name: SUBSCRIBE
     type: fallback
