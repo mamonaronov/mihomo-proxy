@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Stop mihomo-proxy and remove its systemd unit.
+# Stop the mihomo-proxy container and remove its systemd unit if installed.
+# Also stops a container started with ./deploy.sh --once (no unit).
 # Does not delete ./data, images, volumes, or the docker network.
 set -euo pipefail
 
+ROOT="$(cd "$(dirname "$0")" && pwd)"
 UNIT="mihomo-proxy.service"
 UNIT_PATH="/etc/systemd/system/${UNIT}"
 WANTS_PATH="/etc/systemd/system/multi-user.target.wants/${UNIT}"
@@ -11,8 +13,11 @@ usage() {
   cat <<EOF
 Usage: $(basename "$0")
 
-Stops ${UNIT} (ExecStop runs docker compose stop), disables it,
-and removes ${UNIT_PATH}.
+Stops the mihomo-proxy container with docker compose stop, including one
+started by ./deploy.sh --once with no systemd unit.
+
+If ${UNIT} is installed, stops it (ExecStop runs docker compose stop),
+disables it, and removes ${UNIT_PATH}.
 
 Leaves ./data, images, volumes, and the telegram-proxy network in place.
 EOF
@@ -47,38 +52,69 @@ run_sudo() {
   fi
 }
 
-need_cmd systemctl
-if [[ "$(id -u)" -ne 0 ]] && ! command -v sudo >/dev/null 2>&1; then
-  echo "error: need root or sudo to remove the systemd unit" >&2
-  exit 1
+unit_loaded=0
+if command -v systemctl >/dev/null 2>&1 && systemctl cat "$UNIT" >/dev/null 2>&1; then
+  unit_loaded=1
 fi
 
-if systemctl cat "$UNIT" >/dev/null 2>&1; then
-  echo "==> stopping $UNIT"
-  if ! run_sudo systemctl stop "$UNIT"; then
-    echo "warning: systemctl stop $UNIT failed; removing the unit anyway" >&2
+unit_files=0
+if [[ -e "$UNIT_PATH" || -L "$WANTS_PATH" || -e "$WANTS_PATH" ]]; then
+  unit_files=1
+fi
+
+if [[ "$unit_loaded" -eq 1 || "$unit_files" -eq 1 ]]; then
+  need_cmd systemctl
+  if [[ "$(id -u)" -ne 0 ]] && ! command -v sudo >/dev/null 2>&1; then
+    echo "error: need root or sudo to remove the systemd unit" >&2
+    exit 1
   fi
-  echo "==> disabling $UNIT"
-  run_sudo systemctl disable "$UNIT"
+
+  if [[ "$unit_loaded" -eq 1 ]]; then
+    echo "==> stopping $UNIT"
+    if ! run_sudo systemctl stop "$UNIT"; then
+      echo "warning: systemctl stop $UNIT failed; removing the unit anyway" >&2
+    fi
+    echo "==> disabling $UNIT"
+    run_sudo systemctl disable "$UNIT"
+  else
+    echo "==> $UNIT is not loaded"
+  fi
+
+  if [[ -e "$UNIT_PATH" ]]; then
+    echo "==> removing $UNIT_PATH"
+    run_sudo rm -f "$UNIT_PATH"
+  fi
+
+  if [[ -L "$WANTS_PATH" || -e "$WANTS_PATH" ]]; then
+    echo "==> removing $WANTS_PATH"
+    run_sudo rm -f "$WANTS_PATH"
+  fi
+
+  echo "==> systemd daemon-reload"
+  run_sudo systemctl daemon-reload
+  run_sudo systemctl reset-failed "$UNIT" >/dev/null 2>&1 || true
 else
-  echo "==> $UNIT is not loaded"
+  echo "==> $UNIT is not installed"
 fi
 
-if [[ -e "$UNIT_PATH" ]]; then
-  echo "==> removing $UNIT_PATH"
-  run_sudo rm -f "$UNIT_PATH"
+need_cmd docker
+echo "==> docker compose stop"
+(
+  cd "$ROOT"
+  docker compose --project-directory "$ROOT" -f "$ROOT/docker-compose.yml" stop
+)
+running="$(docker inspect -f '{{.State.Running}}' mihomo-proxy 2>/dev/null || true)"
+if [[ "$running" == "true" ]]; then
+  echo "==> docker stop mihomo-proxy"
+  docker stop mihomo-proxy
 fi
-
-if [[ -L "$WANTS_PATH" || -e "$WANTS_PATH" ]]; then
-  echo "==> removing $WANTS_PATH"
-  run_sudo rm -f "$WANTS_PATH"
-fi
-
-echo "==> systemd daemon-reload"
-run_sudo systemctl daemon-reload
-run_sudo systemctl reset-failed "$UNIT" >/dev/null 2>&1 || true
 
 echo
 echo "done"
-echo "  unit     removed"
-echo "  data     left in place"
+if [[ "$unit_loaded" -eq 1 || "$unit_files" -eq 1 ]]; then
+  echo "  unit       removed"
+else
+  echo "  unit       not installed"
+fi
+echo "  container  $(docker inspect -f '{{.State.Status}}' mihomo-proxy 2>/dev/null || echo not-created)"
+echo "  data       left in place"

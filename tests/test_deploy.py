@@ -52,6 +52,23 @@ class TestDeploy(unittest.TestCase):
         self.assertNotIn("git fetch", text)
         self.assertNotRegex(text, re.compile(r"^\s*git pull\b", re.M))
 
+    def test_down_sh_stops_container_without_unit(self) -> None:
+        path = REPO / "down.sh"
+        subprocess.check_call(["bash", "-n", str(path)])
+        mode = path.stat().st_mode
+        self.assertTrue(mode & stat.S_IXUSR, f"{path} must be executable")
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("docker compose", text)
+        self.assertIn("stop", text)
+        self.assertIn("docker stop mihomo-proxy", text)
+        self.assertIn("is not installed", text)
+        self.assertNotIn("compose down", text)
+        marker = 'echo "==> $UNIT is not installed"'
+        before, after = text.split(marker, 1)
+        self.assertIn("systemctl stop", before)
+        self.assertIn("docker compose --project-directory", after)
+        self.assertIn("docker stop mihomo-proxy", after)
+
     def test_systemd_unit_starts_compose_not_host_mihomo(self) -> None:
         text = (REPO / "deploy" / "mihomo-proxy.service").read_text(encoding="utf-8")
         self.assertIn("Type=oneshot", text)

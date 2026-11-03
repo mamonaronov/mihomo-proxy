@@ -31,7 +31,7 @@ To update later: git pull --ff-only && ./deploy.sh
                   Start the container with restart policy "no", so Docker
                   does not start it again after a reboot.
                   An already installed unit is left in place; remove it
-                  with ./down.sh.
+                  with ./down.sh. ./down.sh also stops this container.
 EOF
 }
 
